@@ -1,0 +1,34 @@
+# DSH bundle patch for the petdex.dev companion-pet market plugin.
+# Registers a long-lived service that:
+#   - serves the petdex manifest + same-origin sprite proxy under /petdex-market/*
+#   - persists the user's installed-pet collection + desktop prefs to
+#     settings.yaml (namespace: petdex-market)
+#   - enforces single-active-companion semantics
+#   - spawns/kills the native macOS desktop-pet renderer (petdex-renderer)
+#     based on desktopEnabled + activePetId
+#
+# The Settings UI tab is mounted client-side via the `settings.section` slot
+# (see client/client.js).
+
+- insert:
+    - id: petdex-market
+      name: '@jasper/dsh-plugin-petdex-market'
+      inject:
+        - settings
+        - sessions
+      config:
+        enabled: false
+        dataDir: ''
+        # How many pets to fetch per market page.
+        pageSize: 48
+        # Manifest in-memory TTL (ms).
+        manifestTtlMs: 300000
+        # Per-pet metadata in-memory TTL (ms).
+        metaTtlMs: 1800000
+        # Proxied market sprite in-memory TTL (ms).
+        spriteTtlMs: 600000
+        # Desktop-pet prefs.
+        desktopEnabled: true
+        petScale: 1
+        petLiveliness: 0.6
+        bubbleEnabled: true

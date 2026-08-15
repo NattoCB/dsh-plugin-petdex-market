@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Compiled artifacts (rebuild with the commands in README)
+petdex-renderer
+
+# macOS
+.DS_Store
+
+# Agent / editor intermediate artifacts
+*.log
+*.tmp
+.eslintcache
+.idea/
+.vscode/
+
+# Local settings / credentials (never commit user state)
+settings.yaml
+.credentials.yaml
