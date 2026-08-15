@@ -57,6 +57,17 @@ const SETTINGS_SCHEMA = z.object({
 const PLUGIN_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RENDERER_BIN = path.join(PLUGIN_ROOT, 'petdex-renderer');
 
+/** Concatenate the text blocks of an assistant/message event into one line. */
+function assistantText(event) {
+  const blocks = event.data?.message?.content ?? [];
+  return blocks
+    .filter((b) => b && b.type === 'text')
+    .map((b) => String(b.text ?? ''))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export const apply = (ctx, config) => {
   new PetdexMarketService(ctx, config || {});
 };
@@ -74,7 +85,9 @@ class PetdexMarketService {
     this._source = () => ({ pets: [], activePetId: '', ...config });
     this._webPort = null;
     this._child = null;
-    this._activity = { state: 'idle', at: 0, bubble: '' };
+    this._activeTurns = new Set();
+    this._turnBubble = new Map();
+    this._lastEvent = { state: 'idle', at: 0, bubble: '' };
 
     setManifestTtl(Number(config.manifestTtlMs) || 300000);
 
@@ -98,24 +111,28 @@ class PetdexMarketService {
       onChange: () => this._syncFromSource(),
     });
 
-    // Feed the desktop pet from agent activity: the pet runs while a session
-    // receives a user message, and waves + pops a bubble when a reply lands.
-    ctx.on('session/event', (_session, event) => {
+    // Feed the desktop pet from agent activity: the pet runs for the whole
+    // turn (agent working on one user message) and waves + pops a bubble once
+    // when the turn completes. assistant/message only stages the bubble text
+    // of its turn; turn/end is what triggers the wave, so a multi-step reply
+    // (many assistant/message events) still waves exactly once.
+    ctx.on('session/event', (session, event) => {
       if (!event || typeof event.type !== 'string') return;
-      if (event.type === 'user/message') {
-        this._activity = { state: 'run', at: Date.now(), bubble: '' };
+      const sid = session && session.id ? session.id : 'default';
+      if (event.type === 'turn/start') {
+        this._activeTurns.add(sid);
+        this._turnBubble.set(sid, '');
       } else if (event.type === 'assistant/message') {
-        const blocks = event.data?.message?.content ?? [];
-        const text = blocks
-          .filter((b) => b && b.type === 'text')
-          .map((b) => String(b.text ?? ''))
-          .join(' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        this._activity = {
+        const text = assistantText(event);
+        if (text) this._turnBubble.set(sid, text);
+      } else if (event.type === 'turn/end') {
+        this._activeTurns.delete(sid);
+        const bubble = this._turnBubble.get(sid) ?? '';
+        this._turnBubble.delete(sid);
+        this._lastEvent = {
           state: 'wave',
           at: Date.now(),
-          bubble: text.length > 120 ? text.slice(0, 119).trimEnd() + '…' : text,
+          bubble: bubble.length > 120 ? bubble.slice(0, 119).trimEnd() + '…' : bubble,
         };
       }
     }, { global: true });
@@ -461,6 +478,12 @@ class PetdexMarketService {
             rows: meta.rows,
           };
         }
+        // While any turn is in flight the pet keeps running (fresh timestamp
+        // each poll so the renderer's run override never lapses mid-turn);
+        // otherwise report the last completed event (wave on turn end).
+        const activity = this._activeTurns.size > 0
+          ? { state: 'run', at: Date.now(), bubble: '' }
+          : this._lastEvent;
         return send(200, {
           desktopEnabled: s.desktopEnabled !== false,
           activePet: active,
@@ -470,7 +493,7 @@ class PetdexMarketService {
               ? Math.min(1, Math.max(0, s.petLiveliness))
               : DEFAULT_LIVELINESS,
           bubbleEnabled: s.bubbleEnabled !== false,
-          activity: this._activity,
+          activity,
         });
       }
 
