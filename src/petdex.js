@@ -9,6 +9,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 export const PETDEX_MANIFEST_URL = 'https://petdex.dev/api/manifest';
+export const PETDEX_SEARCH_URL = 'https://petdex.dev/api/pets/search';
 export const PETDEX_ASSET_BASE = 'https://assets.petdex.dev';
 
 /**
@@ -124,6 +125,7 @@ export function clearPetdexCaches() {
   manifestCache = null;
   metaCache.clear();
   marketSpriteCache.clear();
+  catalogCache = null;
 }
 
 /** @param {string} slug */
@@ -288,6 +290,116 @@ export function marketSpriteSrc(slug) {
 /** Resolve the installed-pet sprite URL (same-origin proxy keyed by pet id). */
 export function installedSpriteSrc(id) {
   return `/petdex-market/installed/${encodeURIComponent(id)}/sprite`;
+}
+
+// ── Full catalog index (search API: metrics + timestamps, ~4.5k pets) ──
+
+let catalogCache = null;
+let catalogBuilding = null;
+
+/** One page of the search API (limit is capped at 60 server-side). */
+async function fetchSearchPage(cursor, signal) {
+  const url = new URL(PETDEX_SEARCH_URL);
+  url.searchParams.set('limit', '60');
+  if (cursor != null) url.searchParams.set('cursor', String(cursor));
+  const res = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`petdex.dev search failed (${res.status})`);
+  const data = await res.json();
+  return { pets: data.pets ?? [], total: typeof data.total === 'number' ? data.total : null, nextCursor: data.nextCursor };
+}
+
+/**
+ * Build (or return) the full petdex catalog: every pet from the search API,
+ * joined with the manifest for petJsonUrl, cached for `ttlMs`. The search API
+ * pages at 60 pets per request, so the index takes ~76 requests; they are
+ * fetched with bounded concurrency and the finished index is cached.
+ * @param {number} [ttlMs]
+ * @param {AbortSignal} [signal]
+ */
+export async function fetchPetdexCatalog(ttlMs = 900000, signal) {
+  if (catalogCache && Date.now() - catalogCache.at < ttlMs) return catalogCache.data;
+  if (catalogBuilding) return catalogBuilding;
+  catalogBuilding = (async () => {
+    const manifest = await fetchPetdexManifest(false, signal);
+    const bySlug = new Map(manifest.pets.map((p) => [p.slug, p]));
+    const first = await fetchSearchPage(0, signal);
+    const total = first.total ?? first.pets.length;
+    const pageCount = Math.max(1, Math.ceil(total / 60));
+    const pages = [first];
+    const CONCURRENCY = 8;
+    for (let start = 1; start < pageCount; start += CONCURRENCY) {
+      const window = [];
+      for (let i = start; i < Math.min(pageCount, start + CONCURRENCY); i++) {
+        window.push(fetchSearchPage(i * 60, signal));
+      }
+      const batch = await Promise.all(window);
+      pages.push(...batch);
+    }
+    const pets = pages.flatMap((page) => page.pets).map((s) => {
+      const mp = bySlug.get(s.slug);
+      return {
+        slug: String(s.slug),
+        displayName: String(s.displayName ?? s.slug),
+        kind: String(s.kind ?? ''),
+        submittedBy:
+          typeof s.submittedBy === 'string'
+            ? s.submittedBy
+            : s.submittedBy && typeof s.submittedBy.name === 'string'
+              ? s.submittedBy.name
+              : null,
+        spritesheetUrl: String(s.spritesheetPath ?? mp?.spritesheetUrl ?? ''),
+        petJsonUrl: String(mp?.petJsonUrl ?? ''),
+        zipUrl: String(s.zipUrl ?? mp?.zipUrl ?? ''),
+        featured: s.featured === true,
+        approvedAt: typeof s.approvedAt === 'string' ? s.approvedAt : null,
+        dexNumber: typeof s.dexNumber === 'number' ? s.dexNumber : null,
+        likeCount: Number(s.metrics?.likeCount ?? 0),
+        installCount: Number(s.metrics?.installCount ?? 0),
+      };
+    });
+    const data = { total: pets.length, pets };
+    catalogCache = new CacheEntry(data);
+    return data;
+  })();
+  try {
+    return await catalogBuilding;
+  } finally {
+    catalogBuilding = null;
+  }
+}
+
+/** Whether the full catalog index is already built (fast-path check). */
+export function hasPetdexCatalog() {
+  return !!catalogCache;
+}
+
+/**
+ * Sort catalog entries by one of the supported keys.
+ * @param {{pets:any[], total:number}} catalog
+ * @param {string} sort curated | newest | most-liked | most-installed | alphabetical
+ */
+export function sortCatalogPets(catalog, sort) {
+  const pets = catalog.pets.slice();
+  switch (sort) {
+    case 'curated':
+      pets.sort((a, b) =>
+        (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || b.likeCount - a.likeCount || a.displayName.localeCompare(b.displayName));
+      break;
+    case 'newest':
+      pets.sort((a, b) => (b.approvedAt ?? '').localeCompare(a.approvedAt ?? '') || (b.dexNumber ?? 0) - (a.dexNumber ?? 0));
+      break;
+    case 'most-liked':
+      pets.sort((a, b) => b.likeCount - a.likeCount || a.displayName.localeCompare(b.displayName));
+      break;
+    case 'most-installed':
+      pets.sort((a, b) => b.installCount - a.installCount || a.displayName.localeCompare(b.displayName));
+      break;
+    case 'alphabetical':
+    default:
+      pets.sort((a, b) => a.displayName.localeCompare(b.displayName));
+      break;
+  }
+  return { ...catalog, pets };
 }
 
 export { fs, path };

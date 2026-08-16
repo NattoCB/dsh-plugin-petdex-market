@@ -25,6 +25,10 @@ interface MarketPet {
   spritesheetUrl: string;
   petJsonUrl: string;
   zipUrl: string;
+  featured?: boolean;
+  approvedAt?: string | null;
+  likeCount?: number;
+  installCount?: number;
 }
 interface InstalledPetView {
   id: string;
@@ -47,10 +51,31 @@ interface PetsResponse {
 interface MarketResponse {
   total: number;
   filtered: number;
+  sort: string;
+  sortReady: boolean;
   pets: MarketPet[];
 }
 
 const PAGE_SIZE = 48;
+
+export type PetdexSort = 'curated' | 'newest' | 'most-liked' | 'most-installed' | 'alphabetical';
+export const DEFAULT_SORT: PetdexSort = 'most-liked';
+
+/** In-memory cache of decoded sprite images, keyed by proxy URL. Any preview
+ *  already loaded (installed or not) reuses the same Image instead of
+ *  refetching, until the user clears the cache. */
+const spriteCache = new Map<string, HTMLImageElement>();
+export function clearSpriteCache(): void {
+  spriteCache.clear();
+}
+
+/** Paint one 192×208 frame region of the sprite into the canvas. */
+function paintFrame(c: HTMLCanvasElement, img: HTMLImageElement, fw: number, fh: number) {
+  const ctx = c.getContext('2d');
+  if (!ctx) return;
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.drawImage(img, 0, 0, fw, fh, 0, 0, c.width, c.height);
+}
 
 /**
  * Draws the idle frame (row 0, col 0 of the 8×9 petdex spritesheet) of a pet's
@@ -89,16 +114,21 @@ function PetPreview({ src, size = 96, frameWidth, frameHeight }: {
 
   React.useEffect(() => {
     if (!visible) return;
-    const img = new Image();
-    img.onload = () => {
-      const c = ref.current;
-      if (!c) return;
-      const ctx = c.getContext('2d');
-      if (!ctx) return;
-      ctx.clearRect(0, 0, c.width, c.height);
-      ctx.drawImage(img, 0, 0, fw, fh, 0, 0, c.width, c.height);
-    };
-    img.src = src;
+    const c = ref.current;
+    if (!c) return;
+    let img = spriteCache.get(src);
+    if (!img) {
+      img = new Image();
+      spriteCache.set(src, img);
+      img.src = src;
+    }
+    const paint = () => paintFrame(c, img!, fw, fh);
+    if (img.complete && img.naturalWidth > 0) {
+      paint();
+      return;
+    }
+    img.addEventListener('load', paint, { once: true });
+    img.addEventListener('error', () => { spriteCache.delete(src); }, { once: true });
   }, [src, visible, fw, fh]);
 
   return (
@@ -119,6 +149,8 @@ export function PetdexSection(_props: Record<string, unknown>) {
   const [marketFiltered, setMarketFiltered] = React.useState(0);
   const [query, setQuery] = React.useState('');
   const [offset, setOffset] = React.useState(0);
+  const [sort, setSort] = React.useState<PetdexSort>(DEFAULT_SORT);
+  const [marketSortReady, setMarketSortReady] = React.useState(true);
   const [marketLoading, setMarketLoading] = React.useState(false);
   const [marketError, setMarketError] = React.useState<string | null>(null);
 
@@ -180,11 +212,11 @@ export function PetdexSection(_props: Record<string, unknown>) {
     }
   }, []);
 
-  const loadMarket = React.useCallback(async (q: string, off: number, replace: boolean) => {
+  const loadMarket = React.useCallback(async (q: string, off: number, replace: boolean, s: PetdexSort = sort) => {
     setMarketLoading(true);
     setMarketError(null);
     try {
-      const params = new URLSearchParams({ q, offset: String(off), limit: String(PAGE_SIZE) });
+      const params = new URLSearchParams({ q, offset: String(off), limit: String(PAGE_SIZE), sort: s });
       const res = await fetch(`/petdex-market/market?${params.toString()}`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -194,23 +226,40 @@ export function PetdexSection(_props: Record<string, unknown>) {
       const data = (await res.json()) as MarketResponse;
       setMarketTotal(data.total);
       setMarketFiltered(data.filtered);
+      setMarketSortReady(data.sortReady !== false);
       setMarketPets((prev) => (replace ? data.pets : [...prev, ...data.pets]));
     } catch (e) {
       setMarketError(e instanceof Error ? e.message : 'Failed to load petdex market');
     } finally {
       setMarketLoading(false);
     }
-  }, []);
+  }, [sort]);
 
   React.useEffect(() => {
     void loadInstalled().finally(() => setLoading(false));
     void loadMarket('', 0, true);
-  }, [loadInstalled, loadMarket]);
+    // Mount-only: the initial sort is DEFAULT_SORT by design.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // While the popularity index builds server-side, poll until the sort is
+  // actually applied (server returns sortReady:false in the meantime).
+  React.useEffect(() => {
+    if (tab !== 'market' || marketSortReady || sort === 'alphabetical') return;
+    const id = window.setInterval(() => { void loadMarket(query, offset, true); }, 5000);
+    return () => window.clearInterval(id);
+  }, [tab, marketSortReady, sort, query, offset, loadMarket]);
 
   const onSearch = (value: string) => {
     setQuery(value);
     setOffset(0);
     void loadMarket(value, 0, true);
+  };
+  const onSortChange = (value: string) => {
+    const s = (value as PetdexSort);
+    setSort(s);
+    setOffset(0);
+    void loadMarket(query, 0, true, s);
   };
   const onShowMore = () => {
     const next = offset + PAGE_SIZE;
@@ -316,6 +365,7 @@ export function PetdexSection(_props: Record<string, unknown>) {
         setCacheMsg(data.error || 'Failed to clear cache');
       } else {
         setCacheMsg('Cache cleared. Previews will refetch.');
+        clearSpriteCache();
         await loadInstalled();
       }
     } catch (e) {
@@ -485,17 +535,34 @@ export function PetdexSection(_props: Record<string, unknown>) {
         <div className="pxm_space">
           <div className="pxm_markethead">
             <h3 className="pxm_h3">{t('market')}</h3>
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => onSearch(e.target.value)}
-              placeholder={t('search')}
-              className="pxm_search"
-            />
+            <div className="pxm_markettools">
+              <select
+                className="pxm_sort"
+                value={sort}
+                onChange={(e) => onSortChange(e.target.value)}
+                aria-label={t('sortLabel')}
+              >
+                <option value="most-liked">{t('sortMostLiked')}</option>
+                <option value="curated">{t('sortCurated')}</option>
+                <option value="newest">{t('sortNewest')}</option>
+                <option value="most-installed">{t('sortMostInstalled')}</option>
+                <option value="alphabetical">{t('sortAlphabetical')}</option>
+              </select>
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => onSearch(e.target.value)}
+                placeholder={t('search')}
+                className="pxm_search"
+              />
+            </div>
           </div>
           <div className="pxm_muted">
             {t('totalCount').replace('{{count}}', String(marketTotal))}
           </div>
+          {!marketSortReady && sort !== 'alphabetical' && (
+            <div className="pxm_cachemsg">{t('indexBuilding')}</div>
+          )}
 
           {marketError && <div className="pxm_err">Error: {marketError}</div>}
 
@@ -688,6 +755,13 @@ const PETDEX_COPY: Record<string, string> = {
   empty: 'Nothing collected yet. Install a pet from the Market tab.',
   market: 'Market',
   search: 'Search pets…',
+  sortLabel: 'Sort',
+  sortMostLiked: 'Most liked',
+  sortCurated: 'Curated',
+  sortNewest: 'Newest',
+  sortMostInstalled: 'Most installed',
+  sortAlphabetical: 'Alphabetical',
+  indexBuilding: 'Building the popularity index… sorting will apply automatically in a few seconds.',
   loading: 'Loading market…',
   showMore: 'Show more',
   totalCount: '{{count}} pets in the catalog',

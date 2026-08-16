@@ -30,6 +30,9 @@ const css = `
 .pxm_space{display:flex;flex-direction:column;gap:14px}
 .pxm_h3{margin:0;font-size:15px;font-weight:600}
 .pxm_markethead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.pxm_markettools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pxm_sort{max-width:180px;padding:6px 10px;font-size:13px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);outline:none}
+.pxm_sort:focus{border-color:var(--dsw-alias-state-business-primary)}
 .pxm_search{width:260px;max-width:100%;padding:6px 12px;font-size:13px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);outline:none}
 .pxm_search:focus{border-color:var(--dsw-alias-state-business-primary)}
 .pxm_loading{padding:48px 0;text-align:center;color:var(--dsw-alias-label-tertiary);font-size:13px}

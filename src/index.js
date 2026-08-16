@@ -26,6 +26,9 @@ import {
   findManifestPet,
   clearPetdexCaches,
   setManifestTtl,
+  fetchPetdexCatalog,
+  hasPetdexCatalog,
+  sortCatalogPets,
   PetdexInstalledPet,
   installedSpriteSrc,
   marketSpriteSrc,
@@ -38,6 +41,7 @@ const SETTINGS_NS = settingsNamespace('petdex-market');
 const MIN_SCALE = 0.4;
 const MAX_SCALE = 2.5;
 const DEFAULT_LIVELINESS = 0.6;
+const CATALOG_TTL_MS = 900000;
 
 const SETTINGS_SCHEMA = z.object({
   enabled: z.boolean().default(false),
@@ -314,29 +318,78 @@ class PetdexMarketService {
       const url = new URL(req.url, 'http://x');
       const path = url.pathname.replace(/^\/petdex-market\/?/, '');
 
-      // Market list (paginated + filtered).
+      // Market list (paginated + filtered + sorted).
       if (req.method === 'GET' && path === 'market') {
         const q = (url.searchParams.get('q') || '').toLowerCase().trim();
         const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
         const limit = Math.max(1, Number(url.searchParams.get('limit')) || this._pageSize());
-        const manifest = await fetchPetdexManifest(false, req.signal);
-        const all = manifest.pets;
+        const CATALOG_SORTS = ['curated', 'newest', 'most-liked', 'most-installed'];
+        const sort = CATALOG_SORTS.includes(url.searchParams.get('sort'))
+          ? url.searchParams.get('sort')
+          : 'most-liked';
+
+        // Stats-based sorts need the full search-API index; alphabetical only
+        // needs the manifest. While the index builds (first request), fall
+        // back to the manifest order and flag sortReady:false.
+        let base;
+        let sortReady = false;
+        if (sort === 'alphabetical') {
+          const manifest = await fetchPetdexManifest(false, req.signal);
+          base = manifest.pets.map((p) => ({
+            slug: p.slug,
+            displayName: p.displayName,
+            kind: p.kind,
+            submittedBy: p.submittedBy,
+            spritesheetUrl: p.spritesheetUrl,
+            petJsonUrl: p.petJsonUrl,
+            zipUrl: p.zipUrl,
+            featured: false,
+            approvedAt: null,
+            dexNumber: null,
+            likeCount: 0,
+            installCount: 0,
+          }));
+          base.sort((a, b) => a.displayName.localeCompare(b.displayName));
+          sortReady = true;
+        } else if (hasPetdexCatalog()) {
+          const catalog = await fetchPetdexCatalog(CATALOG_TTL_MS, req.signal);
+          base = sortCatalogPets(catalog, sort).pets;
+          sortReady = true;
+        } else {
+          const manifest = await fetchPetdexManifest(false, req.signal);
+          base = manifest.pets.map((p) => ({
+            slug: p.slug,
+            displayName: p.displayName,
+            kind: p.kind,
+            submittedBy: p.submittedBy,
+            spritesheetUrl: p.spritesheetUrl,
+            petJsonUrl: p.petJsonUrl,
+            zipUrl: p.zipUrl,
+            featured: false,
+            approvedAt: null,
+            dexNumber: null,
+            likeCount: 0,
+            installCount: 0,
+          }));
+          sortReady = false;
+          // Kick off the index build in the background (independent of this
+          // request's abort signal); the next poll gets the sorted list.
+          void fetchPetdexCatalog(CATALOG_TTL_MS, undefined).catch(() => {});
+        }
         const filtered = q
-          ? all.filter((p) =>
+          ? base.filter((p) =>
               (p.displayName || '').toLowerCase().includes(q) ||
               (p.kind || '').toLowerCase().includes(q) ||
               (p.submittedBy || '').toLowerCase().includes(q))
-          : all;
-        const page = filtered.slice(offset, offset + limit).map((p) => ({
-          slug: p.slug,
-          displayName: p.displayName,
-          kind: p.kind,
-          submittedBy: p.submittedBy,
-          spritesheetUrl: p.spritesheetUrl,
-          petJsonUrl: p.petJsonUrl,
-          zipUrl: p.zipUrl,
-        }));
-        return send(200, { total: manifest.total, filtered: filtered.length, pets: page });
+          : base;
+        const page = filtered.slice(offset, offset + limit);
+        return send(200, {
+          total: base.length,
+          filtered: filtered.length,
+          sort,
+          sortReady,
+          pets: page,
+        });
       }
 
       // Installed pets collection + desktop prefs.
