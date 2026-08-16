@@ -660,13 +660,16 @@ function PetdexCard(props: PetdexCardProps) {
             </div>
           ) : (
             <>
-              <div className="pxm_toggle">
-                <input
-                  type="checkbox"
-                  checked={installed.enabled}
-                  disabled={busy}
-                  onChange={(e) => onToggle(e.target.checked)}
-                />
+              <div className="pxm_switch">
+                <label className="pxm_switchlabel">
+                  <input
+                    type="checkbox"
+                    checked={installed.enabled}
+                    disabled={busy}
+                    onChange={(e) => onToggle(e.target.checked)}
+                  />
+                  <span className="pxm_switchtrack" />
+                </label>
                 <span className="pxm_muted">{installed.enabled ? t('enabled') : t('disabled')}</span>
               </div>
               <div className="pxm_cardbtns">
@@ -728,8 +731,11 @@ function InstalledPetCard(props: InstalledPetCardProps) {
         </div>
       ) : (
         <>
-          <div className="pxm_toggle">
-            <input type="checkbox" checked={inst.enabled} disabled={busy} onChange={(e) => onToggle(e.target.checked)} />
+          <div className="pxm_switch">
+            <label className="pxm_switchlabel">
+              <input type="checkbox" checked={inst.enabled} disabled={busy} onChange={(e) => onToggle(e.target.checked)} />
+              <span className="pxm_switchtrack" />
+            </label>
             <span className="pxm_muted">{inst.enabled ? t('enabled') : t('disabled')}</span>
           </div>
           <div className="pxm_cardbtns">

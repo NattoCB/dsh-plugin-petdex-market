@@ -47,6 +47,15 @@ const css = `
 .pxm_sub{font-size:10px;color:var(--dsw-alias-label-tertiary);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pxm_cardactions{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:4px;min-width:0}
 .pxm_toggle{display:flex;align-items:center;gap:6px}
+.pxm_switch{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.pxm_switchlabel{position:relative;display:inline-flex;flex:0 0 auto;cursor:pointer}
+.pxm_switchlabel input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.pxm_switchtrack{display:block;width:34px;height:20px;border-radius:999px;background:var(--dsw-alias-interactive-bg-hover,#3a4a6b);position:relative;transition:background .15s ease;pointer-events:none}
+.pxm_switchtrack::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s ease;box-shadow:0 1px 2px rgba(0,0,0,.35)}
+.pxm_switchlabel input:checked + .pxm_switchtrack{background:var(--dsw-alias-state-business-primary)}
+.pxm_switchlabel input:checked + .pxm_switchtrack::after{transform:translateX(14px)}
+.pxm_switchlabel input:disabled + .pxm_switchtrack{opacity:.55}
+.pxm_switchlabel input:focus-visible + .pxm_switchtrack{box-shadow:0 0 0 2px var(--dsw-alias-bg-layer-1),0 0 0 4px var(--dsw-alias-state-business-primary)}
 .pxm_cardbtns{display:flex;flex-wrap:wrap;gap:6px;width:100%;min-width:0}
 .pxm_hint{font-size:10px;color:var(--dsw-alias-label-tertiary);margin:0}
 .pxm_rename{display:flex;align-items:center;flex-wrap:wrap;gap:4px;width:100%;min-width:0}
