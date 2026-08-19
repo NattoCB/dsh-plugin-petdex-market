@@ -35,6 +35,12 @@ the bottom of your screen, reacts to agent activity, and pops speech bubbles.
 
 > Prerequisites: a working DSH with a `web` profile. · 前置：可用的 DSH 及 `web` profile。
 
+One-line install · 一条命令安装:
+
+```bash
+dsh plugin --profile web add github:NattoCB/dsh-plugin-petdex-market
+```
+
 1. Get the plugin · 获取插件（本仓库或打包 tgz）:
 
    ```bash
