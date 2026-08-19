@@ -4,15 +4,24 @@
   <img src="banner.png" alt="Petdex for DSH — Your desktop companion pet" width="100%" />
 </p>
 
-A **DeepSeek Harness (DSH)** plugin that brings **petdex** companion-pet
-feature to DSH: browse the live [petdex.dev](https://petdex.dev) catalog in the
-Settings UI, install / enable / rename / delete pets (single-active companion
-model), and render the active pet as a **floating desktop pet** that walks along
-the bottom of your screen, reacts to agent activity, and pops speech bubbles.
+> **Working with DSH doesn't have to feel like staring at a console.** A
+> **DeepSeek Harness (DSH)** plugin that brings **petdex** companion-pet
+> feature to DSH: browse the live [petdex.dev](https://petdex.dev) catalog in the
+> Settings UI, install / enable / rename / delete pets (single-active companion
+> model), and render the active pet as a **floating desktop pet** that walks along
+> the bottom of your screen, reacts to agent activity, and pops speech bubbles.
+>
+> 基于 petdex 的 **DSH（DeepSeek Harness）** 插件：在 Settings 界面浏览
+> [petdex.dev](https://petdex.dev) 实时宠物市集，支持安装 / 启用 / 改名 / 删除（单活跃伙伴模型），
+> 并把当前活跃宠物渲染为**桌面悬浮宠物**——沿屏幕底部行走、响应 agent 工作状态、弹出对话气泡。
 
-基于 petdex 的 **DSH（DeepSeek Harness）** 插件：在 Settings 界面浏览
-[petdex.dev](https://petdex.dev) 实时宠物市集，支持安装 / 启用 / 改名 / 删除（单活跃伙伴模型），
-并把当前活跃宠物渲染为**桌面悬浮宠物**——沿屏幕底部行走、响应 agent 工作状态、弹出对话气泡。
+## 为什么需要一只宠物 / Why a pet
+
+Agent 在工作时，你只能盯着状态栏的数字猜「它在忙什么」。这只宠物把工作状态变成了看得见、摸得着的存在：
+思考时它奔跑、回复落地时它挥手并弹出气泡、空闲时它打盹——你的工作台有了一座「活」的脉搏。
+When your agent works, the pet runs; when a reply lands, it waves and pops a
+speech bubble; when idle, it naps — a living pulse on your desktop instead of
+a silent progress bar.
 
 ---
 
@@ -162,3 +171,9 @@ assistant reply → pet `wave` + bubble) and exposes the latest activity in
 
 Pet artwork and catalog by [petdex.dev](https://petdex.dev) and their community.
 宠物素材与目录来自 [petdex.dev](https://petdex.dev) 及其社区。
+
+---
+
+**领一只回去 / Try it:** 一行安装、重启，然后在 Settings 的 **Petdex** 页签挑一只陪你工作的伙伴。
+发现渲染器或市集的问题？[提 issue](https://github.com/NattoCB/dsh-plugin-petdex-market/issues)。
+Install with one line, restart, and pick a companion from the **Petdex** tab. Bugs or ideas? [Open an issue](https://github.com/NattoCB/dsh-plugin-petdex-market/issues).
