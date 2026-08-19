@@ -9,6 +9,14 @@
     "./client": "./client/client.js",
     "./package.json": "./package.json"
   },
+  "files": [
+    "src",
+    "client",
+    "renderer",
+    "petdex-renderer",
+    "cordis.patch.yml",
+    "README.md"
+  ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
