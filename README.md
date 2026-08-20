@@ -1,179 +1,175 @@
 # DSH Petdex Market · 宠物市集插件
 
-<p align="center">
-  <img src="banner.png" alt="Petdex for DSH — Your desktop companion pet" width="100%" />
-</p>
+<!-- Hero -->
+<div align="center">
+  <b style="font-size: 1.15em;">在 DSH Settings 里逛 petdex.dev 实时市集，装一只桌面宠物陪 agent 干活。</b><br />
+  <span style="color:#666">A petdex.dev companion-pet market in DSH Settings, with a native macOS desktop pet.</span><br /><br />
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-yellow.svg" /></a>
+  <img alt="Version" src="https://img.shields.io/badge/version-0.1.0-blue" />
+  <img alt="Platform" src="https://img.shields.io/badge/platform-macOS-lightgrey" /><br /><br />
+  <img alt="桌面宠物" src="https://img.shields.io/badge/-桌面宠物-4d6bfe" />
+  <img alt="宠物市集" src="https://img.shields.io/badge/-宠物市集-4d6bfe" />
+  <img alt="petdex.dev" src="https://img.shields.io/badge/-petdex.dev-4d6bfe" />
+  <img alt="Settings集成" src="https://img.shields.io/badge/-Settings集成-4d6bfe" />
+  <img alt="Swift/AppKit" src="https://img.shields.io/badge/-Swift/AppKit-4d6bfe" /><br /><br />
+  <b>接入面</b> —— Settings 页签（<code>settings.section</code> slot）· <code>petdex-market</code> settings 命名空间 · <code>/petdex-market/*</code> HTTP API
+</div>
 
-> **Working with DSH doesn't have to feel like staring at a console.** A
-> **DeepSeek Harness (DSH)** plugin that brings **petdex** companion-pet
-> feature to DSH: browse the live [petdex.dev](https://petdex.dev) catalog in the
-> Settings UI, install / enable / rename / delete pets (single-active companion
-> model), and render the active pet as a **floating desktop pet** that walks along
-> the bottom of your screen, reacts to agent activity, and pops speech bubbles.
->
-> 基于 petdex 的 **DSH（DeepSeek Harness）** 插件：在 Settings 界面浏览
-> [petdex.dev](https://petdex.dev) 实时宠物市集，支持安装 / 启用 / 改名 / 删除（单活跃伙伴模型），
-> 并把当前活跃宠物渲染为**桌面悬浮宠物**——沿屏幕底部行走、响应 agent 工作状态、弹出对话气泡。
+> 一个 **DSH（DeepSeek Harness）** 插件：在 Settings 的 **Petdex** 页签浏览 [petdex.dev](https://petdex.dev) 实时市集，
+> 安装 / 启用 / 改名 / 删除宠物（单活跃伙伴模型），并把活跃宠物渲染为原生**桌面宠物**（Swift/AppKit 透明置顶窗口；
+> agent 工作时奔跑，回复落地时挥手 + 气泡）。
+> 数据流向：目录直连 petdex.dev（`/api/manifest` + `/api/pets/search`，约 4,500 只），贴图经服务端
+> **同源代理**转发给 WebView 与渲染器（内存缓存可一键清空）。接入：一条命令
+> `dsh plugin --profile web add github:NattoCB/dsh-plugin-petdex-market`，重启后 Settings 出现 **Petdex** 页签；渲染器每 2 秒轮询 `GET /petdex-market/desktop`。
 
-## 为什么需要一只宠物 / Why a pet
+## ✨ 功能一览 / Features
 
-Agent 在工作时，你只能盯着状态栏的数字猜「它在忙什么」。这只宠物把工作状态变成了看得见、摸得着的存在：
-思考时它奔跑、回复落地时它挥手并弹出气泡、空闲时它打盹——你的工作台有了一座「活」的脉搏。
-When your agent works, the pet runs; when a reply lands, it waves and pops a
-speech bubble; when idle, it naps — a living pulse on your desktop instead of
-a silent progress bar.
+- 🛒 **实时市集 Market**：live catalog 直连 petdex.dev（`/api/manifest` + `/api/pets/search`，约 4,500 只）；按名称 / 种类 / 作者搜索、分页、5 种排序（curated / newest / most-liked / most-installed / alphabetical）。stats 排序首次请求在后台构建全量索引（60 只/页、并发 8、约 76 个请求），期间回退 manifest 顺序并标记 `sortReady: false`。
+- 🐾 **宠物管理 Pets**：「安装」= 在 `petdex-market.pets` 持久化一条记录并托管其预览，不下载宠物文件；单活跃伙伴模型——启用一只自动禁用其余，安装即设为活跃，删除活跃宠物后自动切换下一只已启用宠物。
+- 🖼️ **同源贴图代理 Sprite proxy**：市集与已装宠物的 spritesheet 全部经 `/petdex-market/sprite/<slug>`、`/petdex-market/installed/<id>/sprite` 服务端转发，WebView 预览无 CORS 问题；10 分钟 TTL 缓存，Settings 内一键清空。
+- 🦎 **原生桌面宠物 Desktop pet**：`petdex-renderer`（Swift/AppKit）透明、无边框、置顶窗口，沿主屏幕底部自主行走、边缘折返、可拖拽（拖后冻结 3 秒）、右键菜单（禁用 / 重载 / 退出）；尺寸 0.4–2.5 倍等比缩放，`liveliness` 控制行走 / 休息占空比。
+- 🏃 **感知 agent 工作状态 Activity**：订阅 DSH `session/event`——`turn/start` → 奔跑，`assistant/message` → 暂存气泡文本，`turn/end` → 挥手 + 弹一次气泡（多段回复只挥手一次，气泡截断至 120 字符）；渲染器每 2 秒轮询 `GET /petdex-market/desktop`。
+- ⚙️ **配置热加载 Hot reload**：全部设置存于 `petdex-market` settings 命名空间（写入 settings.yaml），改动即时生效，无需重启；渲染器进程由服务端管理（spawn / kill，崩溃 2 秒后自动重启一次）。
 
----
+## 📸 效果预览 / Preview
 
-## Features · 功能
+![Petdex for DSH — desktop companion pet](banner.png)
 
-- **Marketplace** · 市集：search, pagination, live catalog (4,500+ pets)；
-  搜索、分页、实时目录（4500+ 只宠物）
-- **Desktop pet renderer** · 桌面渲染：transparent, always-on-top native window
-  (Swift/AppKit)；透明置顶原生窗口（Swift/AppKit）
-  - walks across the bottom of the screen, bounces at margins, drag to move；
-    沿屏幕底部行走、边缘折返、可拖拽
-  - `liveliness` controls the walk/pause duty cycle (calm ↔ lively)；
-    `liveliness` 控制行走/休息占空比（安静 ↔ 活跃）
-  - `pet size` scales 40%–250% with exact aspect ratio；`尺寸` 40%–250% 等比缩放
-  - runs while the agent works; waves + pops a **speech bubble** when a reply lands
-    (bubble toggleable)；agent 工作时奔跑，回复落地时挥手 + **气泡**（可关闭）
-- **Same-origin sprite proxy** · 同源贴图代理：no CORS issues in the WebView
+## 🚀 Quick Start
 
-## Install · 安装
+### 前置 / Prerequisites
 
-> Prerequisites: a working DSH with a `web` profile. · 前置：可用的 DSH 及 `web` profile。
+- 可用的 DSH 及 `web` profile（a working DSH with a `web` profile）
+- macOS（桌面渲染器为 Swift/AppKit 原生二进制）
 
-One-line install · 一条命令安装:
+### 安装 / Install
+
+一行安装（one-line install）：
 
 ```bash
 dsh plugin --profile web add github:NattoCB/dsh-plugin-petdex-market
 ```
 
-1. Get the plugin · 获取插件（本仓库或打包 tgz）:
-
-   ```bash
-   git clone <this-repo> dsh-plugin-petdex-market
-   ```
-
-2. Register it in the web profile · 注册进 web profile
-   (edit `~/.dsh/profiles/web/package.json`)：
-
-   ```json
-   {
-     "dependencies": {
-       "@jasper/dsh-plugin-petdex-market": "file:/path/to/dsh-plugin-petdex-market"
-     },
-     "dsh": {
-       "profile": {
-         "bundles": [
-           "@deepseek-ai/dsh-base",
-           "@deepseek-ai/dsh-web-app",
-           "@jasper/dsh-plugin-petdex-market"
-         ]
-       }
-     }
-   }
-   ```
-
-   Then link it into the profile · 然后链接进 profile：
-
-   ```bash
-   dsh plugin --profile web add /path/to/dsh-plugin-petdex-market
-   # (equivalent manual fallback: symlink it under
-   #  ~/.dsh/profiles/web/node_modules/@jasper/dsh-plugin-petdex-market)
-   ```
-
-3. Enable in `~/.dsh/settings.yaml` · 在 settings.yaml 启用：
-
-   ```yaml
-   petdex-market:
-     enabled: true
-     desktopEnabled: true   # render the desktop pet · 渲染桌面宠物
-     petScale: 1            # 0.4 – 2.5
-     petLiveliness: 0.6     # 0 (calm) – 1 (lively)
-     bubbleEnabled: true
-   ```
-
-4. Restart `dsh web`. The **Petdex** tab appears under Settings. · 重启 `dsh web`，Settings 出现 **Petdex** 标签页。
-
-## Configuration · 配置
-
-| Key · 键 | Type · 类型 | Default · 默认 | Meaning · 含义 |
-|---|---|---|---|
-| `petdex-market.enabled` | bool | `false` | master switch for the whole plugin · 插件总开关 |
-| `petdex-market.desktopEnabled` | bool | `true` | render the floating desktop pet · 渲染桌面悬浮宠物 |
-| `petdex-market.petScale` | number | `1` | render scale, clamped 0.4–2.5 · 渲染倍率（0.4–2.5） |
-| `petdex-market.petLiveliness` | number | `0.6` | walk/pause duty cycle, 0–1 · 行走活跃度（0–1） |
-| `petdex-market.bubbleEnabled` | bool | `true` | speech bubble on session reply · 回复时弹气泡 |
-| `petdex-market.pageSize` | number | `48` | market page size · 市集分页大小 |
-| `petdex-market.manifestTtlMs` | number | `300000` | catalog manifest cache (ms) · 目录缓存 |
-| `petdex-market.metaTtlMs` | number | `1800000` | per-pet metadata cache (ms) · 元数据缓存 |
-| `petdex-market.spriteTtlMs` | number | `600000` | proxied sprite cache (ms) · 贴图代理缓存 |
-
-Installed pets live under `petdex-market.pets` (auto-managed). All settings
-hot-reload — no restart needed for config edits.
-已安装宠物存于 `petdex-market.pets`（自动管理）。所有配置热加载，无需重启。
-
-## HTTP API · 接口
-
-| Route · 路由 | Method | Purpose · 用途 |
-|---|---|---|
-| `/petdex-market/market?q=&offset=&limit=` | GET | paginated + filtered catalog · 分页过滤目录 |
-| `/petdex-market/pets` | GET | installed pets + desktop prefs · 已装宠物 + 桌面配置 |
-| `/petdex-market/pets` | POST | install `{slug}` (becomes active) · 安装（成为活跃） |
-| `/petdex-market/pets/<id>` | PATCH | `{enabled, buddyName}` (single-active) · 启用/改名 |
-| `/petdex-market/pets/<id>` | DELETE | remove · 删除 |
-| `/petdex-market/desktop` | GET | renderer config (pet + geometry + prefs + activity) · 渲染器配置 |
-| `/petdex-market/desktop` | POST | `{enabled, scale, liveliness, bubbleEnabled}` · 更新桌面配置 |
-| `/petdex-market/sprite/<slug>` | GET | same-origin market sprite proxy · 同源市集贴图 |
-| `/petdex-market/installed/<id>/sprite` | GET | same-origin installed sprite proxy · 同源已装贴图 |
-| `/petdex-market/meta/<slug>` | GET | pet.json metadata · 宠物元数据 |
-| `/petdex-market/cache` | POST | flush in-memory caches · 清缓存 |
-
-## Build · 构建
-
-Only needed when changing the client UI or the native renderer. · 仅在改动前端 UI 或原生渲染器时需要。
+本地路径安装（开发 / 离线）：
 
 ```bash
-# 1. client bundle (esbuild, temporary dev dependency)
-npm i -D esbuild
-node build-client.mjs          # writes client/client.js
+git clone <this-repo> dsh-plugin-petdex-market
+```
 
-# 2. native macOS renderer (requires Xcode Command Line Tools)
+在 `~/.dsh/profiles/web/package.json` 注册依赖与 bundle：
+
+```json
+{
+  "dependencies": {
+    "@jasper/dsh-plugin-petdex-market": "file:/path/to/dsh-plugin-petdex-market"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "@jasper/dsh-plugin-petdex-market"
+      ]
+    }
+  }
+}
+```
+
+然后链进 profile：
+
+```bash
+dsh plugin --profile web add /path/to/dsh-plugin-petdex-market
+# 手动等价方式：在 ~/.dsh/profiles/web/node_modules/@jasper/ 下 symlink
+```
+
+### 运行 / Run
+
+在 `~/.dsh/settings.yaml` 启用：
+
+```yaml
+petdex-market:
+  enabled: true
+  desktopEnabled: true   # 渲染桌面宠物
+  petScale: 1            # 0.4 – 2.5
+  petLiveliness: 0.6     # 0 (calm) – 1 (lively)
+  bubbleEnabled: true
+```
+
+重启 `dsh web`，Settings 出现 **Petdex** 页签——挑一只，开始干活。
+
+## ⚙️ Configuration
+
+| Key | Type | Default | Meaning · 含义 |
+|:----|:-----|:--------|:--------|
+| `petdex-market.enabled` | bool | `false` | 插件总开关 master switch |
+| `petdex-market.desktopEnabled` | bool | `true` | 渲染桌面悬浮宠物 render desktop pet |
+| `petdex-market.petScale` | number | `1` | 渲染倍率，0.4–2.5 render scale (clamped) |
+| `petdex-market.petLiveliness` | number | `0.6` | 行走 / 休息占空比，0–1 walk/pause duty cycle |
+| `petdex-market.bubbleEnabled` | bool | `true` | 回复时弹气泡 speech bubble on reply |
+| `petdex-market.pageSize` | number | `48` | 市集分页大小 market page size |
+| `petdex-market.manifestTtlMs` | number | `300000` | 目录 manifest 缓存（ms） |
+| `petdex-market.metaTtlMs` | number | `1800000` | 宠物元数据缓存（ms） |
+| `petdex-market.spriteTtlMs` | number | `600000` | 贴图代理缓存（ms） |
+
+`pets` 与 `activePetId` 由插件自动管理（auto-managed）。全部配置热加载，修改无需重启。
+
+## 🌐 HTTP API
+
+| Route | Method | Purpose · 用途 |
+|:------|:-------|:--------|
+| `/petdex-market/market?q=&offset=&limit=&sort=` | GET | 分页 + 过滤 + 排序目录 |
+| `/petdex-market/pets` | GET | 已装宠物 + 桌面配置 |
+| `/petdex-market/pets` | POST | 安装 `{slug}`（成为活跃） |
+| `/petdex-market/pets/<id>` | PATCH | `{enabled, buddyName}`（单活跃） |
+| `/petdex-market/pets/<id>` | DELETE | 删除 |
+| `/petdex-market/desktop` | GET | 渲染器配置（宠物 + 帧几何 + 偏好 + 活动状态） |
+| `/petdex-market/desktop` | POST | `{enabled, scale, liveliness, bubbleEnabled}` |
+| `/petdex-market/sprite/<slug>` | GET | 同源市集贴图代理 |
+| `/petdex-market/installed/<id>/sprite` | GET | 同源已装贴图代理 |
+| `/petdex-market/meta/<slug>` | GET | pet.json 元数据 |
+| `/petdex-market/cache` | POST | 清空内存缓存 |
+
+## 🔨 Build
+
+仅在改动前端 UI 或原生渲染器时需要。
+
+```bash
+# 1. client bundle（esbuild，临时 dev dependency）
+npm i -D esbuild
+node build-client.mjs          # 写入 client/client.js（window.__ModuleLoader__ 加载）
+
+# 2. 原生 macOS 渲染器（需要 Xcode Command Line Tools）
 swiftc -O renderer/main.swift -o petdex-renderer
 ```
 
-## Architecture · 架构
+## 🧱 Architecture
 
 ```
 dsh-plugin-petdex-market/
 ├── src/
-│   ├── index.js        # server: settings namespace, /petdex-market API,
-│   │                   #   single-active enforcement, session/event → pet states,
-│   │                   #   renderer process lifecycle (spawn/kill/watchdog)
-│   └── petdex.js       # petdex.dev client lib (manifest, meta normalize, sprite cache)
-├── renderer/main.swift # native macOS pet window (transparent, always-on-top,
-│                       #   walker, drag, bubble, right-click menu)
-├── client_src.tsx      # Settings tab component
-├── client/client.js    # esbuild output, loaded via window.__ModuleLoader__
-├── cordis.patch.yml    # bundle registration (settings + sessions injection)
-└── build-client.mjs    # client bundling script
+│   ├── index.js        # server：settings 命名空间、/petdex-market API、
+│   │                   #   单活跃约束、session/event → 宠物状态、
+│   │                   #   渲染器进程生命周期（spawn/kill/watchdog）
+│   └── petdex.js       # petdex.dev client（manifest、pet.json 归一化、目录索引、贴图缓存）
+├── renderer/main.swift # 原生 macOS 宠物窗口（透明置顶、行走器、拖拽、气泡、右键菜单）
+├── client_src.tsx      # Settings 页签组件
+├── client/client.js    # esbuild 产物，window.__ModuleLoader__.load() 挂载 settings.section slot
+├── cordis.patch.yml    # bundle 注册（settings + sessions 注入）
+└── build-client.mjs    # client 打包脚本
 ```
 
-The server subscribes to DSH `session/event` (user message → pet `run`;
-assistant reply → pet `wave` + bubble) and exposes the latest activity in
-`GET /petdex-market/desktop`; the renderer polls it every 2 s.
 服务端订阅 DSH `session/event`（用户消息 → 宠物 `run`；助手回复 → `wave` + 气泡），
-通过 `GET /petdex-market/desktop` 暴露最新活动状态；渲染器每 2 秒轮询。
+通过 `GET /petdex-market/desktop` 暴露最新活动状态；渲染器每 2 秒轮询一次。
 
 ## Credits · 致谢
 
-Pet artwork and catalog by [petdex.dev](https://petdex.dev) and their community.
 宠物素材与目录来自 [petdex.dev](https://petdex.dev) 及其社区。
+Pet artwork and catalog by [petdex.dev](https://petdex.dev) and their community.
 
 ---
 
-**领一只回去 / Try it:** 一行安装、重启，然后在 Settings 的 **Petdex** 页签挑一只陪你工作的伙伴。
-发现渲染器或市集的问题？[提 issue](https://github.com/NattoCB/dsh-plugin-petdex-market/issues)。
-Install with one line, restart, and pick a companion from the **Petdex** tab. Bugs or ideas? [Open an issue](https://github.com/NattoCB/dsh-plugin-petdex-market/issues).
+<div align="center">
+
+[GitHub](https://github.com/NattoCB/dsh-plugin-petdex-market) · [Issues](https://github.com/NattoCB/dsh-plugin-petdex-market/issues) · [LICENSE](LICENSE) · MIT
+
+</div>
