@@ -12,6 +12,7 @@
   <img alt="petdex.dev" src="https://img.shields.io/badge/-petdex.dev-4d6bfe" />
   <img alt="Settings集成" src="https://img.shields.io/badge/-Settings集成-4d6bfe" />
   <img alt="Swift/AppKit" src="https://img.shields.io/badge/-Swift/AppKit-4d6bfe" /><br /><br />
+  <a href="https://awesome-dsh-plugin.com"><img src="https://awesome-dsh-plugin.com/badge.svg" alt="awesome · DSH 插件" /></a><br /><br />
   <b>接入面</b> —— Settings 页签（<code>settings.section</code> slot）· <code>petdex-market</code> settings 命名空间 · <code>/petdex-market/*</code> HTTP API
 </div>
 
